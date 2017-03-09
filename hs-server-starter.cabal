@@ -15,24 +15,32 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Lib
+  exposed-modules:     Network.ServerStarter.Socket
   build-depends:       base >= 4.7 && < 5
+                     , network
   default-language:    Haskell2010
 
-executable hs-server-starter-exe
+executable server-starter-warp-example
   hs-source-dirs:      app
-  main-is:             Main.hs
+  main-is:             server-starter-warp-example.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
                      , hs-server-starter
+                     , http-types
+                     , warp
+                     , wai
+                     , network
   default-language:    Haskell2010
 
 test-suite hs-server-starter-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
-  main-is:             Spec.hs
+  main-is:             test-ss-socket.hs
   build-depends:       base
                      , hs-server-starter
+                     , network
+                     , unix
+                     , HUnit
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 
