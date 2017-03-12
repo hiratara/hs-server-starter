@@ -1,3 +1,43 @@
+{-|
+Module      : Network.ServerStarter.Socket
+Description : Write a server supporting Server::Starter's protocol in Haskell
+Copyright   : Copyright (C) 2017- hiratara
+License     : GPL-3
+Maintainer  : hiratara@cpan.org
+Stability   : experimental
+Provides a utility to write server program which can be called via Perl's
+<https://github.com/kazuho/p5-Server-Starter start_server> program using
+Haskell.
+
+Since the 'listenAll' function returns a listened 'Network.Socket.Socket',
+please call 'Network.Socket.accept' on it.
+
+@
+  import qualified Network.ServerStarter.Socket as Starter
+  import qualified Network.Socket               as Socket
+  import qualified Network.Wai                  as Wai
+  import qualified Network.Wai.Handler.Warp     as Warp
+
+  main :: IO ()
+  main = do
+    (socket:_) <- Starter.listenAll
+    Socket.SockAddrInet port _ <- Socket.getSocketName socket
+    let setting = Warp.setPort (fromEnum port)
+                $ Warp.defaultSettings
+    Warp.runSettingsSocket setting socket app
+
+  app :: Wai.Application
+  app = ...
+@
+
+Then run @start_server@ and access to @http://localhost:12345@ .
+
+@
+  $ start_server --port 12345 -- stack exec server-starter-warp-example
+@
+
+-}
+
 {-# LANGUAGE Strict #-}
 module Network.ServerStarter.Socket
     ( listenAll
@@ -65,6 +105,11 @@ listenSSPort (SSPortUnix _ fd) = do
     Socket.defaultProtocol
     Socket.Listening
 
+{-|
+The 'listenAll' function takes a file descriptor from the environment variable
+@SERVER_STARTER_PORT@ and returns it wrapped in 'Network.Socket.Socket' type.
+With return value as an argument, you can call 'Network.Socket.accept' as it is.
+-}
 listenAll :: IO [Socket.Socket]
 listenAll = do
   ssenv <- Env.getEnv ssEnvVarName
