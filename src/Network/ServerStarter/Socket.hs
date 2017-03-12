@@ -12,7 +12,8 @@ import qualified Text.Read as Read
 ssEnvVarName :: String
 ssEnvVarName = "SERVER_STARTER_PORT"
 
-data SSPort = SSPortTCP String CInt
+data SSPort = SSPortTCP  String CInt
+            | SSPortUnix String CInt
 
 serverPorts :: String -> [SSPort]
 serverPorts cs = go cs
@@ -22,9 +23,10 @@ serverPorts cs = go cs
                                    otherwise  -> []
             in ssport portFd : left
     ssport portFd = let (str, '=' : fd) = break (== '=') portFd
+                        fdcint = read fd :: CInt
                     in if looksLikeHostPort str
-                       then SSPortTCP str (read fd)
-                       else error "not implemented"
+                       then SSPortTCP  str fdcint
+                       else SSPortUnix str fdcint
 
 looksLikeHostPort :: String -> Bool
 looksLikeHostPort str =
@@ -48,6 +50,17 @@ listenSSPort (SSPortTCP _ fd) = do
   Socket.mkSocket
     fd
     Socket.AF_INET
+    Socket.Stream
+    Socket.defaultProtocol
+    Socket.Listening
+
+listenSSPort (SSPortUnix _ fd) = do
+  -- See https://github.com/haskell/network/blob/master/Network/Socket.hsc
+  System.Posix.Internals.setNonBlockingFD fd True
+
+  Socket.mkSocket
+    fd
+    Socket.AF_UNIX
     Socket.Stream
     Socket.defaultProtocol
     Socket.Listening

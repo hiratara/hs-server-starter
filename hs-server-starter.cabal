@@ -39,6 +39,7 @@ test-suite hs-server-starter-test
   build-depends:       base
                      , hs-server-starter
                      , network
+                     , temporary
                      , unix
                      , HUnit
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N

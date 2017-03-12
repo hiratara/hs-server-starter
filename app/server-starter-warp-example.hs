@@ -21,7 +21,9 @@ main :: IO ()
 main = do
   (socket:_) <- Starter.listenAll
   print (Socket.fdSocket socket)
-  Socket.SockAddrInet port _ <- Socket.getSocketName socket
+  port <- flip fmap (Socket.getSocketName socket) $ \addr -> case addr of
+    Socket.SockAddrInet p _ -> p
+    Socket.SockAddrUnix _   -> 0
   print port
   let setting = Warp.setHTTP2Disabled
               . Warp.setPort (fromEnum port)
