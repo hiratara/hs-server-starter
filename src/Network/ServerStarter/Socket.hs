@@ -52,8 +52,7 @@ import qualified Text.Read as Read
 ssEnvVarName :: String
 ssEnvVarName = "SERVER_STARTER_PORT"
 
-data SSPort = SSPortTCP  String CInt
-            | SSPortUnix String CInt
+data SSPort = SSPort Socket.Family String CInt
 
 serverPorts :: String -> [SSPort]
 serverPorts cs = go cs
@@ -64,9 +63,13 @@ serverPorts cs = go cs
             in ssport portFd : left
     ssport portFd = let (str, '=' : fd) = break (== '=') portFd
                         fdcint = read fd :: CInt
-                    in if looksLikeHostPort str
-                       then SSPortTCP  str fdcint
-                       else SSPortUnix str fdcint
+                        fam    = socketFamily str
+                    in SSPort fam str fdcint
+
+socketFamily :: String -> Socket.Family
+socketFamily str = if looksLikeHostPort str
+                   then Socket.AF_INET
+                   else Socket.AF_UNIX
 
 looksLikeHostPort :: String -> Bool
 looksLikeHostPort str =
@@ -82,25 +85,13 @@ looksLikeHostPort str =
       ':' : strPort' -> Read.readMaybe strPort' :: Maybe Socket.PortNumber
       otherwise      -> Nothing
 
-listenSSPort :: SSPort -> IO Socket.Socket
-listenSSPort (SSPortTCP _ fd) = do
+listenSSPort (SSPort fam _ fd) = do
   -- See https://github.com/haskell/network/blob/master/Network/Socket.hsc
   System.Posix.Internals.setNonBlockingFD fd True
 
   Socket.mkSocket
     fd
-    Socket.AF_INET
-    Socket.Stream
-    Socket.defaultProtocol
-    Socket.Listening
-
-listenSSPort (SSPortUnix _ fd) = do
-  -- See https://github.com/haskell/network/blob/master/Network/Socket.hsc
-  System.Posix.Internals.setNonBlockingFD fd True
-
-  Socket.mkSocket
-    fd
-    Socket.AF_UNIX
+    fam
     Socket.Stream
     Socket.defaultProtocol
     Socket.Listening
