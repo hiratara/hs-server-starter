@@ -45,6 +45,7 @@ module Network.ServerStarter.Socket
 
 import Foreign.C.Types (CInt)
 import qualified Network.Socket as Socket
+import qualified System.Directory as Dir
 import qualified System.Environment as Env
 import qualified System.Posix.Internals
 import qualified Text.Read as Read
@@ -96,6 +97,10 @@ listenSSPort (SSPort fam _ fd) = do
     Socket.defaultProtocol
     Socket.Listening
 
+checkUnixPort :: SSPort -> IO Bool
+checkUnixPort (SSPort Socket.AF_UNIX str _) = Dir.doesPathExist str
+checkUnixPort _ = return True
+
 {-|
 The 'listenAll' function takes a file descriptor from the environment variable
 @SERVER_STARTER_PORT@ and returns it wrapped in 'Network.Socket.Socket' type.
@@ -105,4 +110,7 @@ listenAll :: IO [Socket.Socket]
 listenAll = do
   ssenv <- Env.getEnv ssEnvVarName
   let ssports = serverPorts ssenv
+  okUnixPort <- mapM checkUnixPort ssports
+  if and okUnixPort then return()
+                    else error "unix domein socket not found"
   mapM listenSSPort ssports
