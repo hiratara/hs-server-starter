@@ -43,8 +43,10 @@ module Network.ServerStarter.Socket
     ( listenAll
     ) where
 
+import qualified Data.Char as Char
 import Foreign.C.Types (CInt)
 import qualified Network.Socket as Socket
+import qualified System.Directory as Dir
 import qualified System.Environment as Env
 import qualified System.Posix.Internals
 import qualified Text.Read as Read
@@ -52,8 +54,7 @@ import qualified Text.Read as Read
 ssEnvVarName :: String
 ssEnvVarName = "SERVER_STARTER_PORT"
 
-data SSPort = SSPortTCP  String CInt
-            | SSPortUnix String CInt
+data SSPort = SSPort Socket.Family String CInt
 
 serverPorts :: String -> [SSPort]
 serverPorts cs = go cs
@@ -64,46 +65,43 @@ serverPorts cs = go cs
             in ssport portFd : left
     ssport portFd = let (str, '=' : fd) = break (== '=') portFd
                         fdcint = read fd :: CInt
-                    in if looksLikeHostPort str
-                       then SSPortTCP  str fdcint
-                       else SSPortUnix str fdcint
+                        fam    = socketFamily str
+                    in SSPort fam str fdcint
+
+socketFamily :: String -> Socket.Family
+socketFamily str = if looksLikeHostPort str
+                   then Socket.AF_INET
+                   else Socket.AF_UNIX
 
 looksLikeHostPort :: String -> Bool
 looksLikeHostPort str =
-  case mPort of
-    Just _  -> True
-    Nothing -> case mPort' of
-                 Just _  -> True
-                 Nothing -> False
-  where
-    mPort = Read.readMaybe str :: Maybe Socket.PortNumber
-    (host, strPort) =  break (== ':') str
-    mPort' = case strPort of
-      ':' : strPort' -> Read.readMaybe strPort' :: Maybe Socket.PortNumber
-      otherwise      -> Nothing
+  let revstr = reverse str
+      (revPort, revHost) = break (not . Char.isDigit) revstr
+  in case revHost of
+    ""        -> True
+    (':':']':revHost')
+              -> let revHost''   = init revHost'
+                     isHostValid = and $ map (\c -> Char.isDigit c || c == ':') revHost''
+                     paren       = last revHost'
+                  in isHostValid && paren == '['
+    (':':revHost')
+              -> and $ map (\c -> Char.isDigit c || c == '.') revHost'
+    otherwise -> False
 
-listenSSPort :: SSPort -> IO Socket.Socket
-listenSSPort (SSPortTCP _ fd) = do
+listenSSPort (SSPort fam _ fd) = do
   -- See https://github.com/haskell/network/blob/master/Network/Socket.hsc
   System.Posix.Internals.setNonBlockingFD fd True
 
   Socket.mkSocket
     fd
-    Socket.AF_INET
+    fam
     Socket.Stream
     Socket.defaultProtocol
     Socket.Listening
 
-listenSSPort (SSPortUnix _ fd) = do
-  -- See https://github.com/haskell/network/blob/master/Network/Socket.hsc
-  System.Posix.Internals.setNonBlockingFD fd True
-
-  Socket.mkSocket
-    fd
-    Socket.AF_UNIX
-    Socket.Stream
-    Socket.defaultProtocol
-    Socket.Listening
+checkUnixPort :: SSPort -> IO Bool
+checkUnixPort (SSPort Socket.AF_UNIX str _) = Dir.doesPathExist str
+checkUnixPort _ = return True
 
 {-|
 The 'listenAll' function takes a file descriptor from the environment variable
@@ -114,4 +112,7 @@ listenAll :: IO [Socket.Socket]
 listenAll = do
   ssenv <- Env.getEnv ssEnvVarName
   let ssports = serverPorts ssenv
+  okUnixPort <- mapM checkUnixPort ssports
+  if and okUnixPort then return()
+                    else error "unix domein socket not found"
   mapM listenSSPort ssports
