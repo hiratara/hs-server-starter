@@ -43,6 +43,7 @@ module Network.ServerStarter.Socket
     ( listenAll
     ) where
 
+import qualified Data.Char as Char
 import Foreign.C.Types (CInt)
 import qualified Network.Socket as Socket
 import qualified System.Directory as Dir
@@ -74,17 +75,18 @@ socketFamily str = if looksLikeHostPort str
 
 looksLikeHostPort :: String -> Bool
 looksLikeHostPort str =
-  case mPort of
-    Just _  -> True
-    Nothing -> case mPort' of
-                 Just _  -> True
-                 Nothing -> False
-  where
-    mPort = Read.readMaybe str :: Maybe Socket.PortNumber
-    (host, strPort) =  break (== ':') str
-    mPort' = case strPort of
-      ':' : strPort' -> Read.readMaybe strPort' :: Maybe Socket.PortNumber
-      otherwise      -> Nothing
+  let revstr = reverse str
+      (revPort, revHost) = break (not . Char.isDigit) revstr
+  in case revHost of
+    ""        -> True
+    (':':']':revHost')
+              -> let revHost''   = init revHost'
+                     isHostValid = and $ map (\c -> Char.isDigit c || c == ':') revHost''
+                     paren       = last revHost'
+                  in isHostValid && paren == '['
+    (':':revHost')
+              -> and $ map (\c -> Char.isDigit c || c == '.') revHost'
+    otherwise -> False
 
 listenSSPort (SSPort fam _ fd) = do
   -- See https://github.com/haskell/network/blob/master/Network/Socket.hsc
