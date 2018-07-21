@@ -2,3 +2,4 @@
 *.hi
 *.o
 .stack-work/
+hs-server-starter.cabal
