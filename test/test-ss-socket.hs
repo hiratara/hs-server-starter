@@ -29,11 +29,11 @@ main = do
 testListenAll :: (PortNumber -> String -> CInt -> String) -> Test
 testListenAll makeEnv = TestCase $ do
   s <- socket AF_INET Stream defaultProtocol
-  bind s $ SockAddrInet aNY_PORT iNADDR_ANY
+  bind s $ SockAddrInet 0 (tupleToHostAddress (0, 0, 0, 0))
   listen s 1
   let fd = fdSocket s
-  addr@(SockAddrInet port whost) <- getSocketName s
-  host <- inet_ntoa whost
+  addr@(SockAddrInet port _) <- getSocketName s
+  (Just host, _) <- getNameInfo [] True False addr
   let env = makeEnv port host fd
   setEnv "SERVER_STARTER_PORT" env
   forkProcess child
@@ -68,7 +68,7 @@ testListenAllUnix = TestCase $ withSystemTempDirectory "ssstest" $ \tmpdir -> do
 testListenAllIpv6 :: (PortNumber -> String -> CInt -> String) -> Test
 testListenAllIpv6 makeEnv = TestCase $ do
   s <- socket AF_INET6 Stream defaultProtocol
-  bind s $ SockAddrInet6 aNY_PORT 0 iN6ADDR_ANY 0
+  bind s $ SockAddrInet6 0 0 (0, 0, 0, 0) 0
   listen s 1
   let fd = fdSocket s
   addr@(SockAddrInet6 port _ whost _) <- getSocketName s
