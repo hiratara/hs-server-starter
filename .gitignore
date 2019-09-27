@@ -3,3 +3,4 @@
 *.o
 .stack-work/
 hs-server-starter.cabal
+stack.yaml.lock
