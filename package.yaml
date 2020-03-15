@@ -1,5 +1,5 @@
 name: hs-server-starter
-version: 0.1.0.2
+version: 0.1.1.0
 synopsis: Write a server supporting Server::Starter's protocol in Haskell
 description: ! 'Provides a utility to write server program which can be
 
