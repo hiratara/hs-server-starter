@@ -38,7 +38,7 @@ Then run @start_server@ and access to @http://localhost:12345@ .
 
 -}
 
-{-# LANGUAGE Strict #-}
+{-# LANGUAGE Strict, CPP #-}
 module Network.ServerStarter.Socket
     ( listenAll
     ) where
@@ -55,6 +55,18 @@ ssEnvVarName :: String
 ssEnvVarName = "SERVER_STARTER_PORT"
 
 data SSPort = SSPort Socket.Family String CInt
+
+makeSocket :: CInt -> Socket.Family -> IO Socket.Socket
+#if MIN_VERSION_network(3, 0, 0)
+makeSocket fd _ = Socket.mkSocket fd
+#else
+makeSocket fd fam = Socket.mkSocket
+  fd
+  fam
+  Socket.Stream
+  Socket.defaultProtocol
+  Socket.Listening
+#endif
 
 serverPorts :: String -> [SSPort]
 serverPorts cs = go cs
@@ -92,12 +104,7 @@ listenSSPort (SSPort fam _ fd) = do
   -- See https://github.com/haskell/network/blob/master/Network/Socket.hsc
   System.Posix.Internals.setNonBlockingFD fd True
 
-  Socket.mkSocket
-    fd
-    fam
-    Socket.Stream
-    Socket.defaultProtocol
-    Socket.Listening
+  makeSocket fd fam
 
 checkUnixPort :: SSPort -> IO Bool
 checkUnixPort (SSPort Socket.AF_UNIX str _) = Dir.doesPathExist str

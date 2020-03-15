@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, CPP #-}
 module Main (main) where
 
 import Data.List
@@ -10,6 +10,13 @@ import System.Posix.Process
 import Network.ServerStarter.Socket
 import Test.HUnit
 import System.IO.Temp
+
+ioFdSocket :: Socket -> IO CInt
+#if MIN_VERSION_network(3, 1, 0)
+ioFdSocket = unsafeFdSocket
+#else
+ioFdSocket = return . fdSocket
+#endif
 
 main :: IO ()
 main = do
@@ -31,7 +38,7 @@ testListenAll makeEnv = TestCase $ do
   s <- socket AF_INET Stream defaultProtocol
   bind s $ SockAddrInet 0 (tupleToHostAddress (0, 0, 0, 0))
   listen s 1
-  let fd = fdSocket s
+  fd <- ioFdSocket s
   addr@(SockAddrInet port _) <- getSocketName s
   (Just host, _) <- getNameInfo [] True False addr
   let env = makeEnv port host fd
@@ -52,7 +59,7 @@ testListenAllUnix = TestCase $ withSystemTempDirectory "ssstest" $ \tmpdir -> do
       sockaddr   = SockAddrUnix socketfile
   bind s $ sockaddr
   listen s 1
-  let fd = fdSocket s
+  fd <- ioFdSocket s
   -- addr@(SockAddrInet port host) <- getSocketName s
   let env = socketfile ++ "=" ++ show fd
   setEnv "SERVER_STARTER_PORT" env
@@ -70,7 +77,7 @@ testListenAllIpv6 makeEnv = TestCase $ do
   s <- socket AF_INET6 Stream defaultProtocol
   bind s $ SockAddrInet6 0 0 (0, 0, 0, 0) 0
   listen s 1
-  let fd = fdSocket s
+  fd <- ioFdSocket s
   addr@(SockAddrInet6 port _ whost _) <- getSocketName s
   let host = hoststr whost
   let env = makeEnv port host fd
