@@ -54,7 +54,7 @@ import qualified Text.Read as Read
 ssEnvVarName :: String
 ssEnvVarName = "SERVER_STARTER_PORT"
 
-data SSPort = SSPort Socket.Family String CInt
+data SSPort = SSPort String CInt
 
 makeSocket :: CInt -> Socket.Family -> IO Socket.Socket
 #if MIN_VERSION_network(3, 0, 0)
@@ -77,38 +77,15 @@ serverPorts cs = go cs
             in ssport portFd : left
     ssport portFd = let (str, '=' : fd) = break (== '=') portFd
                         fdcint = read fd :: CInt
-                        fam    = socketFamily str
-                    in SSPort fam str fdcint
+                    in SSPort str fdcint
 
-socketFamily :: String -> Socket.Family
-socketFamily str = if looksLikeHostPort str
-                   then Socket.AF_INET
-                   else Socket.AF_UNIX
-
-looksLikeHostPort :: String -> Bool
-looksLikeHostPort str =
-  let revstr = reverse str
-      (revPort, revHost) = break (not . Char.isDigit) revstr
-  in case revHost of
-    ""        -> True
-    (':':']':revHost')
-              -> let revHost''   = init revHost'
-                     isHostValid = and $ map (\c -> Char.isDigit c || c == ':') revHost''
-                     paren       = last revHost'
-                  in isHostValid && paren == '['
-    (':':revHost')
-              -> and $ map (\c -> Char.isDigit c || c == '.') revHost'
-    otherwise -> False
-
-listenSSPort (SSPort fam _ fd) = do
+listenSSPort (SSPort _ fd) = do
   -- See https://github.com/haskell/network/blob/master/Network/Socket.hsc
   System.Posix.Internals.setNonBlockingFD fd True
 
-  makeSocket fd fam
-
-checkUnixPort :: SSPort -> IO Bool
-checkUnixPort (SSPort Socket.AF_UNIX str _) = Dir.doesPathExist str
-checkUnixPort _ = return True
+  -- We always use AF_INET. See perl implementations:
+  -- https://metacpan.org/source/KAZUHO/Starlet-0.31/lib/Plack/Handler/Starlet.pm#L26-30
+  makeSocket fd Socket.AF_INET
 
 {-|
 The 'listenAll' function takes a file descriptor from the environment variable
@@ -119,7 +96,4 @@ listenAll :: IO [Socket.Socket]
 listenAll = do
   ssenv <- Env.getEnv ssEnvVarName
   let ssports = serverPorts ssenv
-  okUnixPort <- mapM checkUnixPort ssports
-  if and okUnixPort then return()
-                    else error "unix domein socket not found"
   mapM listenSSPort ssports
