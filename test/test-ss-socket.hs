@@ -40,7 +40,7 @@ testListenAll makeEnv = TestCase $ do
   listen s 1
   fd <- ioFdSocket s
   addr@(SockAddrInet port _) <- getSocketName s
-  (Just host, _) <- getNameInfo [] True False addr
+  (Just host, _) <- getNameInfo [NI_NUMERICHOST, NI_NUMERICSERV] True False addr
   let env = makeEnv port host fd
   setEnv "SERVER_STARTER_PORT" env
   forkProcess child
