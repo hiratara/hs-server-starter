@@ -2,5 +2,6 @@
 *.hi
 *.o
 .stack-work/
+dist-newstyle/
 hs-server-starter.cabal
 stack.yaml.lock
